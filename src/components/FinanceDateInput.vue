@@ -6,6 +6,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  modelValueEnd: {
+    type: String,
+    default: '',
+  },
   id: {
     type: String,
     default: '',
@@ -30,11 +34,21 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  /** One picker: tap once for a day, or tap start then end for a range */
+  range: {
+    type: Boolean,
+    default: false,
+  },
+  /** YYYY-MM — open calendar on this month when nothing is selected */
+  initialMonth: {
+    type: String,
+    default: '',
+  },
 })
 
 defineOptions({ inheritAttrs: false })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'update:modelValueEnd'])
 
 const root = ref(null)
 const buttonRef = ref(null)
@@ -44,54 +58,19 @@ const menuStyle = ref({})
 const viewYear = ref(new Date().getFullYear())
 const viewMonth = ref(new Date().getMonth())
 
+/** In-progress selection while the menu is open */
+const draftStart = ref('')
+const draftEnd = ref('')
+/** After first tap in range mode, wait for second tap */
+const awaitingEnd = ref(false)
+
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
-const selected = computed(() => {
-  if (!props.modelValue || !/^\d{4}-\d{2}-\d{2}$/.test(props.modelValue)) return null
-  const [y, m, d] = props.modelValue.split('-').map(Number)
+function parseKey(key) {
+  if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(String(key))) return null
+  const [y, m, d] = String(key).split('-').map(Number)
   return new Date(y, m - 1, d)
-})
-
-const displayLabel = computed(() => {
-  if (!selected.value) return 'Pick a date'
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(selected.value)
-})
-
-const monthLabel = computed(() =>
-  new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(
-    new Date(viewYear.value, viewMonth.value, 1),
-  ),
-)
-
-const calendarDays = computed(() => {
-  const first = new Date(viewYear.value, viewMonth.value, 1)
-  const startPad = first.getDay()
-  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate()
-  const cells = []
-  for (let i = 0; i < startPad; i += 1) {
-    cells.push({ key: `e-${i}`, empty: true })
-  }
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = new Date(viewYear.value, viewMonth.value, day)
-    cells.push({
-      key: toKey(date),
-      empty: false,
-      date,
-      day,
-      isSelected: isSameDay(date, selected.value),
-      isToday: isToday(date),
-    })
-  }
-  while (cells.length % 7 !== 0) {
-    cells.push({ key: `e-end-${cells.length}`, empty: true })
-  }
-  return cells
-})
+}
 
 function toKey(date) {
   const y = date.getFullYear()
@@ -101,20 +80,140 @@ function toKey(date) {
 }
 
 function isSameDay(a, b) {
-  return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  return Boolean(
+    a &&
+      b &&
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate(),
+  )
 }
 
-function isToday(date) {
-  return isSameDay(date, new Date())
+function formatShort(date) {
+  if (!date) return ''
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date)
+}
+
+function normalizeRange(startKey, endKey) {
+  const start = startKey || ''
+  const end = endKey || ''
+  if (!start) return { start: '', end: '' }
+  if (!end || end === start) return { start, end: '' }
+  if (end < start) return { start: end, end: start }
+  return { start, end }
+}
+
+const committedStart = computed(() => parseKey(props.modelValue))
+const committedEnd = computed(() => parseKey(props.modelValueEnd))
+
+const displayLabel = computed(() => {
+  const start = committedStart.value
+  if (!start) return props.range ? 'Pick a date or range' : 'Pick a date'
+  const end = committedEnd.value
+  if (!props.range || !end || isSameDay(start, end)) return formatShort(start)
+  return `${formatShort(start)} – ${formatShort(end)}`
+})
+
+const monthLabel = computed(() =>
+  new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(
+    new Date(viewYear.value, viewMonth.value, 1),
+  ),
+)
+
+const previewStart = computed(() => parseKey(draftStart.value))
+const previewEnd = computed(() => {
+  if (!props.range) return previewStart.value
+  if (awaitingEnd.value) return null
+  return parseKey(draftEnd.value) || previewStart.value
+})
+
+const rangeHint = computed(() => {
+  if (!props.range || !isOpen.value) return ''
+  if (!draftStart.value) return 'Tap a start date'
+  if (awaitingEnd.value) return 'Tap an end date — or the same day for one day only'
+  if (draftEnd.value && draftEnd.value !== draftStart.value) {
+    return `${formatShort(previewStart.value)} – ${formatShort(parseKey(draftEnd.value))}`
+  }
+  return formatShort(previewStart.value) || 'Date selected'
+})
+
+const calendarDays = computed(() => {
+  const first = new Date(viewYear.value, viewMonth.value, 1)
+  const startPad = first.getDay()
+  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate()
+  const start = previewStart.value
+  const end = previewEnd.value
+  const startKey = start ? toKey(start) : ''
+  const endKey = end ? toKey(end) : startKey
+  const lo = startKey && endKey && endKey < startKey ? endKey : startKey
+  const hi = startKey && endKey && endKey < startKey ? startKey : endKey
+
+  const cells = []
+  for (let i = 0; i < startPad; i += 1) {
+    cells.push({ key: `e-${i}`, empty: true })
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(viewYear.value, viewMonth.value, day)
+    const key = toKey(date)
+    const isStart = Boolean(start && isSameDay(date, start))
+    const isEnd = Boolean(end && isSameDay(date, end))
+    const inMiddle = Boolean(props.range && lo && hi && lo !== hi && key > lo && key < hi)
+    cells.push({
+      key,
+      empty: false,
+      date,
+      day,
+      isSelected: props.range ? isStart || isEnd : isSameDay(date, committedStart.value),
+      isRangeStart: props.range && isStart,
+      isRangeEnd: props.range && isEnd,
+      isInRange: inMiddle,
+      isToday: isSameDay(date, new Date()),
+    })
+  }
+  while (cells.length % 7 !== 0) {
+    cells.push({ key: `e-end-${cells.length}`, empty: true })
+  }
+  return cells
+})
+
+function loadDraftFromProps() {
+  draftStart.value = props.modelValue || ''
+  draftEnd.value = props.range ? props.modelValueEnd || '' : ''
+  awaitingEnd.value = false
+}
+
+function setCalendarMonth(date) {
+  viewYear.value = date.getFullYear()
+  viewMonth.value = date.getMonth()
+}
+
+function resolveOpenMonth() {
+  if (draftStart.value) {
+    const d = parseKey(draftStart.value)
+    if (d) return d
+  }
+  if (/^\d{4}-\d{2}$/.test(String(props.initialMonth || ''))) {
+    const [y, m] = props.initialMonth.split('-').map(Number)
+    return new Date(y, m - 1, 1)
+  }
+  return new Date()
+}
+
+function commit(startKey, endKey) {
+  const next = normalizeRange(startKey, endKey)
+  emit('update:modelValue', next.start)
+  if (props.range) emit('update:modelValueEnd', next.end)
 }
 
 async function updateMenuPosition() {
   if (!buttonRef.value || !isOpen.value) return
-
   await nextTick()
-  const isMobile = window.matchMedia('(max-width: 767px)').matches
 
-  // Same approach as TaskDateTimeSelect / habit menus: center on mobile
+  const isMobile = window.matchMedia('(max-width: 767px)').matches
   if (isMobile) {
     const width = Math.min(22.5 * 16, window.innerWidth - 24)
     menuStyle.value = {
@@ -148,20 +247,10 @@ async function updateMenuPosition() {
   }
 }
 
-async function toggleMenu() {
-  if (props.disabled) return
-  isOpen.value = !isOpen.value
-  if (!isOpen.value) return
-
-  if (selected.value) {
-    viewYear.value = selected.value.getFullYear()
-    viewMonth.value = selected.value.getMonth()
-  } else {
-    const now = new Date()
-    viewYear.value = now.getFullYear()
-    viewMonth.value = now.getMonth()
-  }
-
+async function openMenu() {
+  loadDraftFromProps()
+  setCalendarMonth(resolveOpenMonth())
+  isOpen.value = true
   await nextTick()
   updateMenuPosition()
   await nextTick()
@@ -170,34 +259,92 @@ async function toggleMenu() {
 
 function closeMenu() {
   isOpen.value = false
+  awaitingEnd.value = false
+}
+
+async function toggleMenu() {
+  if (props.disabled) return
+  if (isOpen.value) {
+    closeMenu()
+    return
+  }
+  await openMenu()
 }
 
 function shiftMonth(delta) {
   const date = new Date(viewYear.value, viewMonth.value + delta, 1)
-  viewYear.value = date.getFullYear()
-  viewMonth.value = date.getMonth()
+  setCalendarMonth(date)
   nextTick(() => updateMenuPosition())
 }
 
 function pickDay(date) {
   if (!date) return
-  emit('update:modelValue', toKey(date))
+  const key = toKey(date)
+
+  if (!props.range) {
+    commit(key, '')
+    closeMenu()
+    return
+  }
+
+  // First tap (or restart after a finished draft): set start, wait for end
+  if (!awaitingEnd.value) {
+    draftStart.value = key
+    draftEnd.value = ''
+    awaitingEnd.value = true
+    return
+  }
+
+  // Second tap: same day = single day; otherwise range
+  draftEnd.value = key === draftStart.value ? '' : key
+  awaitingEnd.value = false
+  commit(draftStart.value, draftEnd.value)
   closeMenu()
 }
 
 function pickToday() {
-  pickDay(new Date())
+  const key = toKey(new Date())
+  if (!props.range) {
+    commit(key, '')
+    closeMenu()
+    return
+  }
+  draftStart.value = key
+  draftEnd.value = ''
+  awaitingEnd.value = false
+  commit(key, '')
+  closeMenu()
+}
+
+function applyDraft() {
+  if (!props.range) {
+    closeMenu()
+    return
+  }
+  // Done after only a start date → filter that one day
+  if (draftStart.value) {
+    const end = awaitingEnd.value ? '' : draftEnd.value
+    commit(draftStart.value, end)
+  }
+  closeMenu()
 }
 
 function clearDate() {
   if (!props.allowClear) return
-  emit('update:modelValue', '')
+  draftStart.value = ''
+  draftEnd.value = ''
+  awaitingEnd.value = false
+  commit('', '')
   closeMenu()
 }
 
 function handleClickOutside(event) {
   if (!isOpen.value) return
   if (root.value?.contains(event.target) || menuRef.value?.contains(event.target)) return
+  // Keep in-progress single-day if user tapped start then clicked away / Done-equivalent
+  if (props.range && draftStart.value && awaitingEnd.value) {
+    commit(draftStart.value, '')
+  }
   closeMenu()
 }
 
@@ -211,11 +358,12 @@ function onKeydown(event) {
 }
 
 watch(
-  () => props.modelValue,
-  () => {
-    if (selected.value) {
-      viewYear.value = selected.value.getFullYear()
-      viewMonth.value = selected.value.getMonth()
+  () => props.initialMonth,
+  (month) => {
+    if (isOpen.value || props.modelValue) return
+    if (/^\d{4}-\d{2}$/.test(String(month || ''))) {
+      const [y, m] = month.split('-').map(Number)
+      setCalendarMonth(new Date(y, m - 1, 1))
     }
   },
 )
@@ -265,7 +413,10 @@ onUnmounted(() => {
           <path d="M8 3v4M16 3v4" />
         </svg>
       </span>
-      <span class="finance-date-input__label" :class="{ 'finance-date-input__label--muted': !selected }">
+      <span
+        class="finance-date-input__label"
+        :class="{ 'finance-date-input__label--muted': !committedStart }"
+      >
         {{ displayLabel }}
       </span>
     </button>
@@ -306,6 +457,8 @@ onUnmounted(() => {
             </button>
           </div>
 
+          <p v-if="rangeHint" class="finance-date-menu__hint">{{ rangeHint }}</p>
+
           <div class="finance-date-menu__weekdays" aria-hidden="true">
             <span v-for="day in WEEKDAYS" :key="day">{{ day }}</span>
           </div>
@@ -319,6 +472,9 @@ onUnmounted(() => {
                 type="button"
                 :class="{
                   'finance-date-menu__day--selected': cell.isSelected,
+                  'finance-date-menu__day--range': cell.isInRange,
+                  'finance-date-menu__day--range-start': cell.isRangeStart,
+                  'finance-date-menu__day--range-end': cell.isRangeEnd,
                   'finance-date-menu__day--today': cell.isToday && !cell.isSelected,
                 }"
                 @click="pickDay(cell.date)"
@@ -333,14 +489,14 @@ onUnmounted(() => {
           <button class="finance-date-menu__ghost" type="button" @click="pickToday">Today</button>
           <div class="finance-date-menu__footer-actions">
             <button
-              v-if="allowClear && modelValue"
+              v-if="allowClear && (modelValue || modelValueEnd)"
               class="finance-date-menu__ghost"
               type="button"
               @click="clearDate"
             >
               Clear
             </button>
-            <button class="finance-date-menu__done" type="button" @click="closeMenu">Done</button>
+            <button class="finance-date-menu__done" type="button" @click="applyDraft">Done</button>
           </div>
         </div>
       </div>

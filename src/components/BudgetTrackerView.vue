@@ -86,6 +86,8 @@ const {
   filterType,
   filterCategoryId,
   filterSearch,
+  filterDateFrom,
+  filterDateTo,
   categories,
   recurring,
   accounts,
@@ -453,7 +455,9 @@ const filtersActive = computed(
   () =>
     filterType.value !== 'all' ||
     filterCategoryId.value !== 'all' ||
-    Boolean(filterSearch.value?.trim()),
+    Boolean(filterSearch.value?.trim()) ||
+    Boolean(filterDateFrom.value) ||
+    Boolean(filterDateTo.value),
 )
 
 const categoryFilterOptions = computed(() => [
@@ -468,6 +472,8 @@ function clearFilters() {
   filterType.value = 'all'
   filterCategoryId.value = 'all'
   filterSearch.value = ''
+  filterDateFrom.value = ''
+  filterDateTo.value = ''
 }
 
 function gainClass(value) {
@@ -1368,6 +1374,20 @@ async function onCreateFromProposal(proposal) {
               >
                 Transfer
               </button>
+            </div>
+
+            <div class="finance-filter-dates">
+              <div class="finance-filter-date finance-filter-date--range">
+                <label class="finance-filter-date__label" for="finance-tx-date">Date</label>
+                <FinanceDateInput
+                  id="finance-tx-date"
+                  v-model="filterDateFrom"
+                  v-model:model-value-end="filterDateTo"
+                  :range="true"
+                  :initial-month="selectedMonth"
+                  aria-label="Filter by date or range"
+                />
+              </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">

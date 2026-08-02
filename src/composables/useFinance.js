@@ -158,6 +158,8 @@ export function useFinance(user) {
   const filterType = ref('all')
   const filterCategoryId = ref('all')
   const filterSearch = ref('')
+  const filterDateFrom = ref('')
+  const filterDateTo = ref('')
 
   const userId = computed(() => user.value?.id)
 
@@ -192,6 +194,18 @@ export function useFinance(user) {
     }
     if (filterCategoryId.value !== 'all') {
       rows = rows.filter((row) => row.category_id === filterCategoryId.value)
+    }
+    const from = String(filterDateFrom.value || '').trim()
+    const to = String(filterDateTo.value || '').trim()
+    if (from && to) {
+      const start = from <= to ? from : to
+      const end = from <= to ? to : from
+      rows = rows.filter((row) => {
+        const on = String(row.occurred_on)
+        return on >= start && on <= end
+      })
+    } else if (from) {
+      rows = rows.filter((row) => String(row.occurred_on) === from)
     }
     const query = filterSearch.value.trim().toLowerCase()
     if (query) {
@@ -1732,6 +1746,8 @@ export function useFinance(user) {
     filterType,
     filterCategoryId,
     filterSearch,
+    filterDateFrom,
+    filterDateTo,
     expenseCategories,
     incomeCategories,
     activeAccounts,

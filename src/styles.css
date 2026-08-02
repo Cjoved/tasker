@@ -6096,6 +6096,18 @@ button {
     gap: 0.4rem;
   }
 
+  .finance-activity .finance-filter-dates {
+    width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .finance-activity .finance-filter-date {
+    min-width: min(100%, 11rem);
+    flex: 1 1 11rem;
+  }
+
   .finance-activity .finance-chip-group {
     gap: 0.25rem;
     flex-wrap: nowrap;
@@ -7529,6 +7541,14 @@ button {
   color: var(--finance-muted);
 }
 
+.finance-date-menu__hint {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--finance-muted);
+  text-align: center;
+}
+
 .finance-date-menu__grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -7570,6 +7590,19 @@ button {
 
 .finance-date-menu__day--selected:hover {
   color: white;
+}
+
+.finance-date-menu__day--range {
+  background: color-mix(in srgb, var(--finance-primary) 14%, transparent);
+  border-radius: 0.35rem;
+}
+
+.finance-date-menu__day--range-start {
+  border-radius: 0.55rem 0.2rem 0.2rem 0.55rem;
+}
+
+.finance-date-menu__day--range-end {
+  border-radius: 0.2rem 0.55rem 0.55rem 0.2rem;
 }
 
 .finance-date-menu__footer {
@@ -8292,6 +8325,32 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
+}
+
+.finance-filter-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.65rem;
+}
+
+.finance-filter-date {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 9.5rem;
+}
+
+.finance-filter-date--range {
+  min-width: min(100%, 16rem);
+}
+
+.finance-filter-date__label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--finance-muted);
 }
 
 .finance-filter-select {
