@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import AppSelect from './AppSelect.vue'
 import { useTheme } from '../composables/useTheme'
+import { useWebPush } from '../composables/useWebPush'
 
 const props = defineProps({
   settings: {
@@ -17,6 +18,16 @@ const props = defineProps({
 const emit = defineEmits(['update', 'close'])
 
 const { isDark, setTheme } = useTheme()
+const {
+  isSupported,
+  isSubscribed,
+  isBusy,
+  errorMessage,
+  statusLabel,
+  refreshSubscriptionState,
+  subscribe,
+  unsubscribe,
+} = useWebPush()
 
 const timezoneOptions = computed(() => {
   const common = ['Asia/Manila', 'UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo']
@@ -37,6 +48,21 @@ function update(patch) {
 function handleBackdropClick(event) {
   if (event.target === event.currentTarget) emit('close')
 }
+
+async function toggleDevicePush(event) {
+  const enabled = event.target.checked
+  if (enabled) {
+    const ok = await subscribe()
+    if (ok) update({ webPushReminders: true })
+    else event.target.checked = false
+    return
+  }
+  await unsubscribe()
+}
+
+onMounted(() => {
+  refreshSubscriptionState()
+})
 </script>
 
 <template>
@@ -104,6 +130,37 @@ function handleBackdropClick(event) {
 
           <section class="task-editor-section">
             <p class="task-editor-section-title">Reminders</p>
+
+            <label class="task-editor-toggle">
+              <span>
+                <span class="task-editor-toggle__title">Device notifications</span>
+                <span class="task-editor-toggle__hint">
+                  {{ statusLabel }}. Brave: allow notifications for this site. 8PM expense reminder + habit/task digests.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                class="task-editor-toggle__input"
+                :checked="isSubscribed && settings.webPushReminders !== false"
+                :disabled="!isSupported || isBusy"
+                @change="toggleDevicePush"
+              />
+            </label>
+            <p v-if="errorMessage" class="mt-2 text-sm text-rose-600 dark:text-rose-400">{{ errorMessage }}</p>
+
+            <label class="task-editor-toggle">
+              <span>
+                <span class="task-editor-toggle__title">Send digests to this account</span>
+                <span class="task-editor-toggle__hint">Master switch for scheduled Web Push (keeps subscription)</span>
+              </span>
+              <input
+                type="checkbox"
+                class="task-editor-toggle__input"
+                :checked="settings.webPushReminders !== false"
+                @change="update({ webPushReminders: $event.target.checked })"
+              />
+            </label>
+
             <label class="task-editor-toggle">
               <span>
                 <span class="task-editor-toggle__title">Telegram reminders</span>

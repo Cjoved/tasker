@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppSidebar from './components/AppSidebar.vue'
 import AuthForm from './components/AuthForm.vue'
 import BoardView from './components/BoardView.vue'
@@ -83,7 +83,12 @@ const {
   openSystemPicker,
   closeSystemPicker,
   selectSystem,
+  applyUrlDeepLink,
 } = useAppSystem(user)
+
+onMounted(() => {
+  applyUrlDeepLink()
+})
 
 const {
   goals,

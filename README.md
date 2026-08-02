@@ -13,7 +13,8 @@ Beyond the dashboards, Personal Hub is an **AI-assisted productivity product**: 
 - **AI task assistant** (text or voice) with tool calling and confirm-before-write
 - **AI scheduler** that suggests due dates for open work (preview → apply)
 - Filters, search, quick add, keyboard shortcuts, undo delete, dark mode
-- **4× daily Telegram reminders** (5 AM, 12 PM, 5 PM, 10 PM Philippines)
+- **4× daily Telegram reminders** (5 AM, 12 PM, 5 PM, **8 PM** Philippines)
+- Optional **Web Push** device notifications (habits, tasks, 8 PM expense nudge)
 - Optional **AI Telegram digest** with fixed-template fallback
 - **Monthly cleanup** of done tasks from the previous calendar month
 
@@ -351,13 +352,23 @@ Alternatively, message [@userinfobot](https://t.me/userinfobot) to get your pers
 | Morning | 5:00 AM | `0 21 * * *` |
 | Noon | 12:00 PM | `0 4 * * *` |
 | Afternoon | 5:00 PM | `0 9 * * *` |
-| Night | 10:00 PM | `0 14 * * *` |
+| Night | 8:00 PM | `0 12 * * *` |
 
 Each slot calls `GET /api/cron/task-reminder?slot=morning|noon|afternoon|night` with `Authorization: Bearer <CRON_SECRET>`.
 
 Messages list **overdue** and **due today** tasks (Asia/Manila). By default a **fixed template** is used. Enable **AI Telegram digest** in Settings to use the AI provider chain (OpenRouter → NVIDIA → Groq → Cerebras → Mistral → template fallback).
 
 Toggle **Telegram reminders** in Settings; preferences are stored in `user_settings` for server-side cron.
+
+### 6.3b Web Push (device notifications)
+
+1. Generate keys once: `npx web-push generate-vapid-keys`
+2. Set on Vercel (and locally): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, and the same public key as `VITE_VAPID_PUBLIC_KEY`
+3. Ensure `APP_URL` is your production origin (used for notification icon URLs)
+4. Apply migration `0021_web_push_subscriptions.sql` (table + RLS + night cron at 8 PM PH)
+5. In the installed PWA (Brave/Android): **Settings → Device notifications** → allow permission
+
+Web Push digests run on the same cron slots: habits/tasks by day, and every **8 PM** expense nudge (“Don't forget to list your expenses.”).
 
 ### 6.4 Configure Supabase Vault (required for pg_cron HTTP)
 

@@ -88,6 +88,24 @@ export function useAppSystem(user) {
     }
   }
 
+  function applyUrlDeepLink() {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const system = params.get('system')
+    if (!system || !VALID_SYSTEMS.includes(system)) return
+
+    selectSystem(system)
+    const section = params.get('section')
+    if (!section) return
+
+    if (system === 'budget' && VALID_BUDGET_SECTIONS.includes(section)) {
+      budgetSection.value = section
+    }
+    if (system === 'habits' && VALID_HABIT_SECTIONS.includes(section)) {
+      habitSection.value = section
+    }
+  }
+
   watch(activeSystem, (value) => writeStorage(SYSTEM_KEY, value))
   watch(budgetSection, (value) => {
     if (VALID_BUDGET_SECTIONS.includes(value)) writeStorage(BUDGET_SECTION_KEY, value)
@@ -131,5 +149,6 @@ export function useAppSystem(user) {
     openSystemPicker,
     closeSystemPicker,
     selectSystem,
+    applyUrlDeepLink,
   }
 }

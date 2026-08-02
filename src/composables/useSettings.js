@@ -8,6 +8,7 @@ const defaults = {
   defaultSpaceId: null,
   telegramReminders: true,
   aiTelegramDigest: false,
+  webPushReminders: true,
   onboardingComplete: false,
 }
 
@@ -37,6 +38,7 @@ function mapRowToSettings(row) {
     defaultSpaceId: row.default_space_id,
     telegramReminders: row.telegram_reminders ?? true,
     aiTelegramDigest: row.ai_telegram_digest ?? false,
+    webPushReminders: row.web_push_reminders ?? true,
     onboardingComplete: row.onboarding_complete ?? false,
   }
 }
@@ -48,6 +50,7 @@ function mapSettingsToRow(userId, snapshot) {
     default_space_id: snapshot.defaultSpaceId,
     telegram_reminders: snapshot.telegramReminders,
     ai_telegram_digest: snapshot.aiTelegramDigest,
+    web_push_reminders: snapshot.webPushReminders,
     onboarding_complete: snapshot.onboardingComplete,
   }
 }
@@ -57,7 +60,7 @@ async function loadRemoteSettings(userId) {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('timezone, default_space_id, telegram_reminders, ai_telegram_digest, onboarding_complete')
+    .select('timezone, default_space_id, telegram_reminders, ai_telegram_digest, web_push_reminders, onboarding_complete')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -119,6 +122,7 @@ export function useSettings(user) {
     defaultSpaceId: computed(() => settings.value.defaultSpaceId),
     telegramReminders: computed(() => settings.value.telegramReminders),
     aiTelegramDigest: computed(() => settings.value.aiTelegramDigest),
+    webPushReminders: computed(() => settings.value.webPushReminders),
     onboardingComplete: computed(() => settings.value.onboardingComplete),
     update,
     completeOnboarding,
