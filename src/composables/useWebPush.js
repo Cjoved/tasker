@@ -101,13 +101,16 @@ export function useWebPush() {
         return false
       }
 
-      const response = await fetch('/api/push/subscribe', {
+      const response = await fetch('/api/push', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(subscription.toJSON()),
+        body: JSON.stringify({
+          action: 'subscribe',
+          ...subscription.toJSON(),
+        }),
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -134,13 +137,13 @@ export function useWebPush() {
       if (subscription) {
         const token = await getAccessToken()
         if (token) {
-          await fetch('/api/push/unsubscribe', {
+          await fetch('/api/push', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({ endpoint: subscription.endpoint }),
+            body: JSON.stringify({ action: 'unsubscribe', endpoint: subscription.endpoint }),
           })
         }
         await subscription.unsubscribe()

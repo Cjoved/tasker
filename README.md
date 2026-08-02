@@ -25,7 +25,7 @@ Beyond the dashboards, Personal Hub is an **AI-assisted productivity product**: 
 ### Personal Finance
 - Accounts, transactions, category limits, recurring items, and goals
 - Net worth overview with investments (including MP2) and debts
-- **Finance AI**: NL expense logging, auto-categorize, insights flags, and coaching (₱ / PH context)
+- **Finance AI**: NL expense logging, insights flags, and coaching (₱ / PH context)
 
 ## Stack
 
@@ -83,7 +83,7 @@ User (text / voice)
 |--------|-----------|-----------|
 | **Tasker** | `/api/ai/chat`, `/api/ai/apply`, `/api/ai/schedule` | Conversational CRUD via tools; schedule JSON suggestions; confirm-to-apply |
 | **Habits** | `/api/ai/habits/log`, `recommend`, `coach`, `sentiment` | NL check-in parsing, suggestions, coaching copy, mood/sentiment signals |
-| **Finance** | `/api/ai/finance/log`, `categorize`, `insights`, `coach` | NL expense → structured fields; category hints; JSON insight flags; PH ₱ coaching |
+| **Finance** | `/api/ai/finance/log`, `insights`, `coach` | NL expense → structured fields; JSON insight flags; PH ₱ coaching |
 | **Reminders** | `/api/cron/task-reminder` | Optional AI digest over overdue/due-today; else fixed template |
 
 ### Reliability & cost controls
@@ -109,7 +109,8 @@ lib/server/ai/
 api/ai/
   chat.js, apply.js, schedule.js
   habits/{log,recommend,coach,sentiment}.js
-  finance/{log,categorize,insights,coach}.js
+  finance/{log,insights,coach}.js
+  push.js                          # Web Push subscribe / unsubscribe
 ```
 
 ### Skills this demonstrates
@@ -646,7 +647,8 @@ tasker/
 │   └── ai/
 │       ├── chat.js, apply.js, schedule.js
 │       ├── habits/                 # log, recommend, coach, sentiment
-│       └── finance/                # log, categorize, insights, coach
+│       └── finance/                # log, insights, coach
+│   └── push.js                     # Web Push subscribe/unsubscribe (Hobby-safe single function)
 ├── lib/server/ai/                  # Provider chain, agent loop, tools, usage caps
 ├── src/                            # Vue app (assistants + FAB UIs)
 ├── supabase/migrations/            # SQL schema incl. ai_usage (0008+)

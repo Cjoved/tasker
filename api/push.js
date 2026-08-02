@@ -1,4 +1,4 @@
-import { requireUser } from '../../lib/server/authRequest.js'
+import { requireUser } from '../lib/server/authRequest.js'
 
 function readSubscription(body) {
   const endpoint = String(body?.endpoint || '').trim()
@@ -21,7 +21,30 @@ export default async function handler(req, res) {
 
   try {
     const { client, user } = await requireUser(req)
-    const { endpoint, p256dh, auth } = readSubscription(req.body || {})
+    const body = req.body || {}
+    const action = String(body.action || req.query?.action || 'subscribe').toLowerCase()
+
+    if (action === 'unsubscribe') {
+      const endpoint = String(body.endpoint || '').trim()
+      if (!endpoint) {
+        return res.status(400).json({ error: 'endpoint required' })
+      }
+
+      const { error } = await client
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('endpoint', endpoint)
+
+      if (error) throw error
+      return res.status(200).json({ ok: true })
+    }
+
+    if (action !== 'subscribe') {
+      return res.status(400).json({ error: 'action must be subscribe or unsubscribe' })
+    }
+
+    const { endpoint, p256dh, auth } = readSubscription(body)
     const userAgent = String(req.headers['user-agent'] || '').slice(0, 500)
 
     const { error } = await client.from('push_subscriptions').upsert(
@@ -41,6 +64,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true })
   } catch (error) {
     const status = error.status || 500
-    return res.status(status).json({ error: error.message || 'Subscribe failed' })
+    return res.status(status).json({ error: error.message || 'Push request failed' })
   }
 }
